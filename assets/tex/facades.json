@@ -1,0 +1,55 @@
+{
+ "tile": 32.0,
+ "emitMax": 8.0,
+ "types": [
+  {
+   "name": "glass",
+   "cells": [
+    16,
+    8
+   ]
+  },
+  {
+   "name": "brutal",
+   "cells": [
+    8,
+    8
+   ]
+  },
+  {
+   "name": "industrial",
+   "cells": [
+    1,
+    1
+   ]
+  },
+  {
+   "name": "neon",
+   "cells": [
+    16,
+    16
+   ]
+  },
+  {
+   "name": "deco",
+   "cells": [
+    8,
+    4
+   ]
+  },
+  {
+   "name": "monolith",
+   "cells": [
+    1,
+    1
+   ]
+  },
+  {
+   "name": "roof",
+   "cells": [
+    1,
+    1
+   ]
+  }
+ ]
+}

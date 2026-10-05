@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>CYBERTAXI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#04060b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CYBERTAXI">
+<meta name="description" content="CYBERTAXI – fly a hover cab through a Blender-rendered cyberpunk megacity. Tilt your phone to steer.">
+<meta property="og:title" content="CYBERTAXI">
+<meta property="og:description" content="Fly a hover cab through a Blender-rendered cyberpunk megacity. Tilt your phone to steer.">
+<meta property="og:image" content="assets/ui/hero.jpg">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/ui/icon-180.png">
+<link rel="icon" href="assets/ui/icon-180.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="brand"><div class="logo">C</div><div class="b-txt"><b>CYBERTAXI</b><span>BLENDER RENDERED · THREE.JS</span></div></div>
+  <div id="gpu"><i></i><span id="gpu-name">WEBGL2</span></div>
+  <div id="deck" class="collapsed">
+    <button id="deck-toggle"><span>FLIGHT DECK</span><b>+</b></button>
+    <div id="deck-body">
+      <label>QUALITY
+        <div class="chips" id="q-chips">
+          <button data-q="low">LOW</button><button data-q="medium">MED</button><button data-q="high">HIGH</button><button data-q="ultra">ULTRA</button>
+        </div>
+      </label>
+      <label>TILT SENSITIVITY <input id="sens" type="range" min="0.5" max="2" step="0.05" value="1"></label>
+      <label>MUSIC <input id="vol-music" type="range" min="0" max="1" step="0.05" value="0.7"></label>
+      <label>SFX <input id="vol-sfx" type="range" min="0" max="1" step="0.05" value="0.8"></label>
+      <div class="row">
+        <button id="btn-cal">⟲ RECENTER TILT</button>
+        <button id="btn-invert">INVERT PITCH: OFF</button>
+      </div>
+      <div class="row">
+        <button id="btn-mode">MODE: TAXI</button>
+        <button id="btn-reset">RESPAWN</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mission" class="hidden">
+    <div id="m-title">PICKUP</div>
+    <div id="m-sub"></div>
+    <div id="m-bar"><i></i></div>
+  </div>
+  <div id="fare"><span>FARE</span><b id="fare-v">$0</b></div>
+  <div id="marker" class="hidden"><div id="marker-arrow"></div><div id="marker-label"></div></div>
+  <div id="toast"></div>
+  <div id="edge-warn" class="hidden">TURN BACK · CITY LIMIT</div>
+
+  <div id="stats"><span>FPS <b id="s-fps">--</b></span><span>MS <b id="s-ms">--</b></span><span>DRAWS <b id="s-draws">--</b></span><span>TRIS <b id="s-tris">--</b></span><span>RES <b id="s-res">--</b></span></div>
+  <div id="speedo"><b id="sp-v">0</b><span>KM/H</span><em id="alt-v">ALT 0 M</em></div>
+  <button id="btn-brake" class="pedal"><span>BRAKE</span></button>
+  <button id="btn-gas" class="pedal"><span>GAS</span></button>
+</div>
+
+<div id="title">
+  <div id="title-bg"></div>
+  <div id="title-in">
+    <div class="t-logo">CYBER<em>TAXI</em></div>
+    <div class="t-sub">MEGACITY · HOVER CAB · BLENDER × THREE.JS</div>
+    <div class="t-spacer"></div>
+    <div id="load"><div id="load-bar"><i></i></div><div id="load-txt">BOOTING…</div></div>
+    <div id="t-menu" class="hidden">
+      <div class="t-row" id="t-quality"><span>GRAPHICS</span>
+        <div class="chips" id="t-q-chips"><button data-q="low">LOW</button><button data-q="medium">MED</button><button data-q="high">HIGH</button><button data-q="ultra">ULTRA</button></div>
+      </div>
+      <div class="t-row" id="t-mode"><span>MODE</span>
+        <div class="chips" id="t-m-chips"><button data-m="taxi" class="on">TAXI MISSIONS</button><button data-m="free">SIGHTSEEING</button></div>
+      </div>
+      <button id="start">TAP TO START</button>
+      <div class="t-help">
+        Hold your phone <b>upright</b>.<br>
+        <b>Tilt</b> like a steering wheel to turn · lean the top <b>away</b> to dive, <b>toward you</b> to climb.<br>
+        <b>GAS</b> right thumb · <b>BRAKE</b> left thumb. Collisions never hurt.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="rotate" class="hidden"><div>⟳</div><p>Please hold your phone in <b>portrait</b>.</p></div>
+<div id="fatal" class="hidden"></div>
+
+<script type="module" src="dist/game.js"></script>
+</body>
+</html>
