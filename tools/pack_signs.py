@@ -27,7 +27,14 @@ for name, im in items:
     if y + h + PAD > AH:
         raise SystemExit("atlas full")
     atlas.paste(im, (x, y))
-    out.append({"name": name, "x": x, "y": y, "w": w, "h": h})
+    import numpy as np
+    a = np.asarray(im).astype(np.float32) / 255.0
+    lin = a ** 2.2
+    lum = lin.mean(axis=2)
+    m = lum > np.percentile(lum, 85)
+    col = (lin[m].mean(axis=0) if m.any() else lin.reshape(-1, 3).mean(axis=0))
+    col = col / max(col.max(), 1e-3)
+    out.append({"name": name, "x": x, "y": y, "w": w, "h": h, "color": [round(float(c), 3) for c in col]})
     x += w + PAD; row_h = max(row_h, h)
 atlas.save(os.path.join(DST, "signs.webp"), quality=90, method=5)
 json.dump({"atlas": [AW, AH], "signs": out}, open(os.path.join(DST, "signs.json"), "w"), indent=1)

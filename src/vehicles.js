@@ -40,6 +40,25 @@ export async function loadVehicle(kind, renderer, { emissive = 3.0, size = 0 } =
   });
   material.normalScale.set(1, -1);
   enableSkyFog(material, { key: 'veh-' + kind });
+  // camera-relative key + cool rim light so the cabs read clearly against the dark canyon
+  const keyU = { value: new THREE.Color(0.55, 0.55, 0.6) }, rimU = { value: new THREE.Color(0.12, 0.3, 0.45) };
+  material.userData.key = keyU; material.userData.rim = rimU;
+  const prevOBC = material.onBeforeCompile;
+  material.onBeforeCompile = (sh, r) => {
+    prevOBC?.(sh, r);
+    sh.uniforms.uKey = keyU; sh.uniforms.uRim = rimU;
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uKey; uniform vec3 uRim;')
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        {
+          vec3 kd = normalize(vec3(0.35, 0.8, 0.5));
+          reflectedLight.directDiffuse += material.diffuseColor * uKey * max(dot(normal, kd), 0.0);
+          vec3 hv = normalize(kd + normalize(vViewPosition));
+          reflectedLight.directSpecular += uKey * 0.6 * pow(max(dot(normal, hv), 0.0), 2.0 / max(material.roughness * material.roughness, 0.02));
+          float rim = pow(1.0 - max(dot(normal, normalize(vViewPosition)), 0.0), 3.0);
+          reflectedLight.directSpecular += uRim * rim;
+        }`);
+  };
   return { kind, geometry, material, marks };
 }
 

@@ -13,15 +13,16 @@ import { AudioEngine } from './audio.js';
 import { Missions } from './missions.js';
 import { Props } from './props.js';
 import { Signs } from './signs.js';
+import { Atmos } from './atmos.js';
 import { timeU, clamp } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 
 const TIERS = {
-  low:    { name: 'low',    dpr: 1.0, msaa: 0, bloomLevels: 4, texRes: 512,  aniso: 2, parallax: 0, skyW: 2048, traffic: 140, searchlights: 4, signs: 160, streaks: 120, vehTex: 512,  taxiTex: 1024 },
-  medium: { name: 'medium', dpr: 1.5, msaa: 0, bloomLevels: 5, texRes: 1024, aniso: 4, parallax: 4, skyW: 2048, traffic: 300, searchlights: 8, signs: 280, streaks: 200, vehTex: 512,  taxiTex: 1024 },
-  high:   { name: 'high',   dpr: 2.0, msaa: 4, bloomLevels: 5, texRes: 1024, aniso: 4, parallax: 5, skyW: 4096, traffic: 460, searchlights: 12, signs: 400, streaks: 280, vehTex: 1024, taxiTex: 2048 },
-  ultra:  { name: 'ultra',  dpr: 3.0, msaa: 4, bloomLevels: 6, texRes: 1536, aniso: 8, parallax: 6, skyW: 4096, traffic: 640, searchlights: 16, signs: 520, streaks: 360, vehTex: 1024, taxiTex: 2048 },
+  low:    { name: 'low',    dpr: 1.0, msaa: 0, bloomLevels: 4, texRes: 512,  aniso: 2, parallax: 0, skyW: 2048, traffic: 140, searchlights: 4, signs: 160, streaks: 120, rain: 500, steam: 16, vehTex: 512,  taxiTex: 1024 },
+  medium: { name: 'medium', dpr: 1.5, msaa: 0, bloomLevels: 5, texRes: 1024, aniso: 4, parallax: 4, skyW: 2048, traffic: 300, searchlights: 8, signs: 280, streaks: 200, rain: 900, steam: 28, vehTex: 512,  taxiTex: 1024 },
+  high:   { name: 'high',   dpr: 2.0, msaa: 4, bloomLevels: 5, texRes: 1024, aniso: 4, parallax: 5, skyW: 4096, traffic: 460, searchlights: 12, signs: 400, streaks: 280, rain: 1400, steam: 40, vehTex: 1024, taxiTex: 2048 },
+  ultra:  { name: 'ultra',  dpr: 3.0, msaa: 4, bloomLevels: 6, texRes: 1536, aniso: 8, parallax: 6, skyW: 4096, traffic: 640, searchlights: 16, signs: 520, streaks: 360, rain: 2000, steam: 56, vehTex: 1024, taxiTex: 2048 },
 };
 
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -137,11 +138,12 @@ async function boot() {
   const vehicles = {};
   let vi = 0;
   await Promise.all(kinds.map(async (k) => {
-    try { vehicles[k] = await loadVehicle(k, renderer, { size: k === 'taxi' ? tier.taxiTex : tier.vehTex, emissive: k === 'taxi' ? 1.4 : 2.2 }); }
+    try { vehicles[k] = await loadVehicle(k, renderer, { size: k === 'taxi' ? tier.taxiTex : tier.vehTex, emissive: k === 'taxi' ? 0.75 : 1.6 }); }
     catch (e) { console.warn('vehicle', k, e); }
     vi++; prog.veh = vi / kinds.length; upd('VEHICLES');
   }));
   if (!vehicles.taxi) return fatal('taxi model failed to load');
+  vehicles.taxi.material.envMapIntensity = 2.4;
   const taxiGroup = new THREE.Group();
   const taxiModel = new THREE.Mesh(vehicles.taxi.geometry, vehicles.taxi.material);
   taxiModel.frustumCulled = false;
@@ -151,6 +153,7 @@ async function boot() {
   fx = new FX(scene, taxiGroup, vehicles.taxi.marks, city, tier);
   fx.setPointScale(state.h);
   props.makePads(fx);
+  const atmos = new Atmos(scene, city, tier);
 
   // ------------------------------------------------------------------ game objects
   const input = new Input();
@@ -236,7 +239,7 @@ async function boot() {
   $('title').classList.add('live');
   window.__booted = true;
   if (downgraded) hud.toast('GRAPHICS LOWERED TO ' + tier.name.toUpperCase() + '\n(previous start did not finish)', 4500);
-  window.__ct = { signs, fogU, taxi, input, city, camera, post, renderer, scene, traffic, missions, fx, state, tier, sky, audio };
+  window.__ct = { chase, signs, fogU, taxi, input, city, camera, post, renderer, scene, traffic, missions, fx, state, tier, sky, audio };
 
   function loop(now) {
     let dt = (now - last) / 1000; last = now;

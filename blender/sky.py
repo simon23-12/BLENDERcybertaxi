@@ -105,7 +105,7 @@ for i in range(70):
     BX.append((cx - wd / 2, cx + wd / 2, cy - 1.5, cy + 1.5, z, z + ht))
     BCOL.append(col)
     BROT.append(ang + math.pi / 2)
-boxes_mesh("boards", BX, BCOL, emissive_material("board", 3.5), rot=BROT)
+# (floating billboards removed: they read as flat rectangles in game)
 
 # searchlight beams
 for i in range(9):

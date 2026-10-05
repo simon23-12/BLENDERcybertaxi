@@ -74,7 +74,7 @@ export class City {
       const hue = rng() < 0.4 ? -0.17 + rng() * 0.27 : 0;
       const lit = lerp(0.05, 0.5, Math.pow(rng(), 1.15));
       const lowerSet = zone < 0.3 ? [[2, 4], [1, 3], [3, 2]] : zone < 0.65 ? [[1, 3], [3, 3], [2, 1]] : [[1, 2], [3, 2], [2, 1]];
-      const bodySet = zone < 0.3 ? [[3, 5], [1, 3], [0, 2]] : zone < 0.65 ? [[0, 4], [4, 3], [3, 3]] : [[5, 4], [0, 3], [4, 3]];
+      const bodySet = zone < 0.3 ? [[3, 3], [1, 3], [0, 2], [5, 1]] : zone < 0.65 ? [[0, 4], [4, 3], [3, 1], [5, 2]] : [[5, 4], [0, 3], [4, 3]];
       const upSet = [[5, 3], [0, 3], [4, 2], [3, 1]];
       const layerP = wpick(lowerSet), layerB = wpick(bodySet);
       const layerU = rng() < 0.55 ? layerB : wpick(upSet);
@@ -117,6 +117,53 @@ export class City {
           push(x0 + ins2, x1 - ins2, z0 + ins2, z1 - ins2, t2, H, layerU === 5 ? 0 : 5);
         }
         ins = ins;
+      }
+      // ---- massing variety: exterior service risers + cantilevered blocks (break the flat box faces)
+      {
+        const own = new Set(tower.tiers);
+        const ignoreOwn = (x0, x1, y0, y1, z0, z1) => {
+          // overlaps anything that is not this tower
+          for (const id of [...own]) { const b = this.boxes[id]; if (x0 < b.x1 && x1 > b.x0 && y0 < b.y1 && y1 > b.y0 && z0 < b.z1 && z1 > b.z0) continue; }
+          let hit = false;
+          const saved = [...own].map((id) => { const b = this.boxes[id]; const s = b.solid; b.solid = false; return [b, s]; });
+          hit = this.overlaps(x0, x1, y0, y1, z0, z1);
+          saved.forEach(([b, s]) => { b.solid = s; });
+          return hit;
+        };
+        const body = tower.tiers.map((id) => this.boxes[id]).sort((a, b) => (b.y1 - b.y0) - (a.y1 - a.y0))[0];
+        const attach = (b, face, along, w, d, y0, y1, layer, solid = true) => {
+          let box;
+          const mx = (b.x0 + b.x1) / 2, mz = (b.z0 + b.z1) / 2;
+          if (face === 0) box = { x0: b.x1 - 1, x1: b.x1 + d, z0: mz + along - w / 2, z1: mz + along + w / 2 };
+          else if (face === 1) box = { x0: b.x0 - d, x1: b.x0 + 1, z0: mz + along - w / 2, z1: mz + along + w / 2 };
+          else if (face === 2) box = { z0: b.z1 - 1, z1: b.z1 + d, x0: mx + along - w / 2, x1: mx + along + w / 2 };
+          else box = { z0: b.z0 - d, z1: b.z0 + 1, x0: mx + along - w / 2, x1: mx + along + w / 2 };
+          if (ignoreOwn(box.x0 - 2, box.x1 + 2, y0, y1, box.z0 - 2, box.z1 + 2)) return -1;
+          const id = this.addBox({ ...box, y0, y1, layer, seed: rng(), hue: rng() < 0.3 ? -0.15 + rng() * 0.25 : 0, lit: R(0.1, 0.5), solid });
+          own.add(id);
+          return id;
+        };
+        if (body && body.y1 - body.y0 > 80) {
+          const nR = rng() < 0.6 ? 1 + Math.floor(rng() * 3) : 0;
+          for (let k = 0; k < nR; k++) {
+            const face = Math.floor(rng() * 4);
+            const span = face < 2 ? body.z1 - body.z0 : body.x1 - body.x0;
+            const w = 8 + 4 * Math.floor(rng() * 2);
+            if (span < w + 24) continue;
+            const along = snap((rng() - 0.5) * (span - w - 16), 4);
+            const stack = rng() < 0.45 ? snap(R(12, 40)) : 0;
+            attach(body, face, along, w, snap(R(4, 8), 2), body.y0, body.y1 + stack, rng() < 0.6 ? 2 : 5);
+          }
+          // cantilever: a heavy block bolted onto the facade at mid height
+          if (rng() < 0.4 && body.y1 - body.y0 > 140) {
+            const face = Math.floor(rng() * 4);
+            const span = face < 2 ? body.z1 - body.z0 : body.x1 - body.x0;
+            const w = snap(span * R(0.35, 0.7));
+            const h = snap(R(16, 40));
+            const y0 = snap(R(body.y0 + 40, body.y1 - h - 24));
+            attach(body, face, snap((rng() - 0.5) * (span - w)), w, snap(R(8, 12), 2), y0, y0 + h, wpick([[0, 2], [3, 2], [5, 2], [1, 1]]));
+          }
+        }
       }
       // roof clutter on the top tier
       {

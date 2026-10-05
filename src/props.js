@@ -32,10 +32,10 @@ export class Props {
           float lampZ = stZ * step(abs(ux - 34.5), 0.9) * step(0.55, fract(q.y / 22.0));
           float id = floor(q.x / 22.0) + floor(q.y / 22.0) * 7.0;
           vec3 lampC = mix(vec3(1.0, 0.55, 0.18), vec3(0.2, 0.85, 1.0), step(0.78, gh(vec2(id, 3.0))));
-          totalEmissiveRadiance += lampC * (lampX + lampZ) * 6.0;
+          totalEmissiveRadiance += lampC * (lampX + lampZ) * 2.6;
           // dashed centre lines
           float cl = stX * step(uz, 0.45) * step(0.5, fract(q.x / 12.0)) + stZ * step(ux, 0.45) * step(0.5, fract(q.y / 12.0));
-          totalEmissiveRadiance += vec3(0.7, 0.8, 1.0) * cl * 1.2;
+          totalEmissiveRadiance += vec3(0.7, 0.8, 1.0) * cl * 0.45;
           // glowing signs / puddle sheen
           float pud = smoothstep(0.55, 0.8, gh(floor(q / 18.0)));
           roughnessFactor = mix(roughnessFactor, 0.05, pud * (stX + stZ));

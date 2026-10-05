@@ -95,8 +95,34 @@ class V:
         for f in {f for v in res["verts"] for f in v.link_faces}:
             f.smooth = True
 
+    def tube(self, mat, cx, cy, cz, r, depth, seg=32, wall=0.025):
+        """open duct along Y with an outer and an inward-facing inner wall"""
+        bm = self.bm(mat)
+        M = Matrix.Translation((cx, cy, cz)) @ Matrix.Rotation(math.radians(90), 4, "X")
+        for rad, flip in ((r, False), (r - wall, True)):
+            res = bmesh.ops.create_cone(bm, cap_ends=False, segments=seg, radius1=rad, radius2=rad, depth=depth, matrix=M)
+            faces = list({f for v in res["verts"] for f in v.link_faces})
+            if flip:
+                bmesh.ops.reverse_faces(bm, faces=faces)
+            for f in faces:
+                f.smooth = True
+
     def empty(self, name, loc):
         self.empties.append((name, loc))
+
+
+def turbine(v, M, cx, cy, cz, r, d, blades=9):
+    """ducted fan seen from outside: chrome lip, blades in front of a glowing plenum, chrome hub.
+    cy = mouth plane, d = +1 if the mouth faces +Y (rear), -1 if -Y (front)."""
+    v.tube(M["chrome"], cx, cy - d * 0.02, cz, r * 1.12, 0.06, wall=r * 0.14)
+    v.cyl(M["blue"], cx, cy - d * 0.20, cz, r * 0.96, 0.02, "y", seg=32)
+    v.cyl(M["inner"], cx, cy - d * 0.23, cz, r * 1.0, 0.03, "y", seg=32)
+    for k in range(blades):
+        a = k * math.tau / blades
+        rr = r * 0.52
+        v.box(M["steel"], cx + math.sin(a) * rr, cy - d * 0.11, cz + math.cos(a) * rr, r * 0.16, 0.025, r * 0.78, 0.0, roty=a + 0.35)
+    v.cyl(M["chrome"], cx, cy - d * 0.08, cz, r * 0.22, 0.08, "y", seg=20)
+    v.cyl(M["cyan"], cx, cy - d * 0.035, cz, r * 0.07, 0.02, "y", seg=12)
 
 
 def mk_materials(paint_rgb, paint_rough=0.28):
@@ -205,16 +231,16 @@ def build_taxi(v, M, rng):
     v.box(M["checker"], 0, 2.865, 1.22, 1.9, 0.02, 0.10, 0.0)
     # rear fins
     for sx in (-1, 1):
-        v.box(P, sx * 1.12, 2.35, 1.62, 0.10, 0.9, 0.38, 0.03, rotx=-0.12)
-        v.box(M["red"], sx * 1.12, 2.78, 1.73, 0.09, 0.05, 0.14, 0.015)
+        v.box(P, sx * 1.14, 2.42, 1.52, 0.07, 1.0, 0.2, 0.025, rotx=0.42)
+        v.box(M["red"], sx * 1.14, 2.88, 1.74, 0.075, 0.08, 0.05, 0.01, rotx=0.42)
     # thrusters: two big ducts at the rear, two pods at the front
     for sx in (-1, 1):
-        v.cyl(M["steel"], sx * 1.02, 2.95, 0.66, 0.40, 0.80, "y", seg=28)
-        v.cyl(M["chrome"], sx * 1.02, 3.31, 0.66, 0.45, 0.06, "y", seg=28)
-        v.cyl(M["inner"], sx * 1.02, 3.345, 0.66, 0.36, 0.02, "y", seg=28)
-        v.cyl(M["blue"], sx * 1.02, 3.36, 0.66, 0.30, 0.02, "y", seg=28)
-        v.cyl(M["steel"], sx * 0.96, -2.10, 0.50, 0.30, 0.55, "y", seg=22)
-        v.cyl(M["blue"], sx * 0.96, -2.40, 0.50, 0.25, 0.03, "y", seg=22)
+        v.cyl(M["steel"], sx * 1.02, 2.75, 0.66, 0.40, 0.70, "y", seg=28)
+        v.tube(M["steel"], sx * 1.02, 3.23, 0.66, 0.40, 0.26)
+        turbine(v, M, sx * 1.02, 3.36, 0.66, 0.37, 1)
+        v.cyl(M["steel"], sx * 0.96, -1.98, 0.50, 0.30, 0.34, "y", seg=22)
+        v.tube(M["steel"], sx * 0.96, -2.27, 0.50, 0.30, 0.24, seg=22)
+        turbine(v, M, sx * 0.96, -2.39, 0.50, 0.27, -1, blades=7)
         v.box(M["steel"], sx * 1.35, 0.9, 0.52, 0.35, 1.6, 0.10, 0.03)          # side sponsons
         v.cyl(M["blue"], sx * 1.35, 0.9, 0.44, 0.19, 0.03, "x" if False else "y", seg=16, rot=(math.radians(90), 0, 0))
     v.empty("thr_rl", (-1.02, 3.40, 0.66)); v.empty("thr_rr", (1.02, 3.40, 0.66))

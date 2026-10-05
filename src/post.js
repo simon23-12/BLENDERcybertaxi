@@ -139,11 +139,11 @@ export class Post {
     this.w = 4; this.h = 4;
     this.levels = [];
     this.u = {
-      bloomGain: { value: 0.9 }, exposure: { value: 1.0 }, time: { value: 0 }, ca: { value: 0.0025 },
+      bloomGain: { value: 0.7 }, exposure: { value: 1.0 }, time: { value: 0 }, ca: { value: 0.0025 },
       vig: { value: 0.55 }, grain: { value: 0.025 }, speed: { value: 0 }, flash: { value: 0 },
       res: { value: new THREE.Vector2(1, 1) },
     };
-    this.down = new FullPass(mat(DOWN, { tSrc: { value: null }, texel: { value: new THREE.Vector2() }, karis: { value: 0 }, thresh: { value: 1.0 } }));
+    this.down = new FullPass(mat(DOWN, { tSrc: { value: null }, texel: { value: new THREE.Vector2() }, karis: { value: 0 }, thresh: { value: 1.3 } }));
     this.up = new FullPass(mat(UP, { tSrc: { value: null }, texel: { value: new THREE.Vector2() }, radius: { value: 1.0 } },
       { blending: THREE.AdditiveBlending, transparent: true }));
     this.comp = new FullPass(mat(COMPOSITE, { tScene: { value: null }, tBloom: { value: null }, ...this.u }));

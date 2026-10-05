@@ -49,6 +49,27 @@ const streakFS = /* glsl */`
 precision highp float; varying float vA; uniform float uPower; uniform vec3 uColor;
 void main(){ gl_FragColor = vec4(uColor * vA * uPower, vA * uPower); }`;
 
+const rainVS = /* glsl */`
+attribute vec3 aBase; attribute float aEnd; attribute float aSeed;
+uniform vec3 uCam; uniform vec3 uRel; uniform float uBox; uniform float uTime; uniform float uLen;
+varying float vA;
+void main(){
+  vec3 fall = vec3(3.0, -26.0, 1.5) * (0.85 + 0.3 * fract(aSeed * 13.7));
+  vec3 p0 = aBase + fall * uTime;
+  vec3 rel = p0 - uCam;
+  rel = mod(rel + vec3(uBox * 0.5), vec3(uBox)) - vec3(uBox * 0.5);
+  vec3 p = uCam + rel;
+  vec3 v = fall - uRel;                         // drop velocity relative to the camera
+  float sp = length(v);
+  p -= (v / sp) * aEnd * clamp(sp * uLen, 0.6, 9.0);
+  float d = length(rel);
+  vA = (1.0 - aEnd * 0.85) * smoothstep(2.5, 6.0, d) * (1.0 - smoothstep(uBox * 0.3, uBox * 0.5, d)) * (0.35 + 0.65 * fract(aSeed * 3.1));
+  gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+}`;
+const rainFS = /* glsl */`
+precision highp float; varying float vA; uniform vec3 uColor; uniform float uPower;
+void main(){ gl_FragColor = vec4(uColor * vA * uPower, vA * uPower); }`;
+
 const pointsVS = /* glsl */`
 attribute float aPhase; attribute float aSize; attribute vec3 aColor; attribute float aLife;
 uniform float uTime; uniform float uScale; uniform float uBlink; uniform float uMode;
@@ -125,8 +146,8 @@ export class FX {
       this.flames.push({ mesh, m, len, big: len > 3 });
     };
     const P = (n, d) => marks[n] || d;
-    mk(P('thr_rl', new THREE.Vector3(-1.0, 0.66, -3.4)), 0.30, 5.5, 0.0);
-    mk(P('thr_rr', new THREE.Vector3(1.0, 0.66, -3.4)), 0.30, 5.5, 2.0);
+    mk(P('thr_rl', new THREE.Vector3(-1.0, 0.66, -3.4)), 0.22, 4.5, 0.0);
+    mk(P('thr_rr', new THREE.Vector3(1.0, 0.66, -3.4)), 0.22, 4.5, 2.0);
     this.flameFront = [];
     // underside glow (bloom catches it)
     // ---- speed streaks
@@ -148,6 +169,28 @@ export class FX {
     }));
     this.streaks.frustumCulled = false; this.streaks.renderOrder = 6;
     scene.add(this.streaks);
+    // ---- rain
+    {
+      const nr = tier.rain ?? 1200;
+      const B = 70;
+      const base = new Float32Array(nr * 2 * 3), end = new Float32Array(nr * 2), seed = new Float32Array(nr * 2);
+      for (let i = 0; i < nr; i++) {
+        const x = (Math.random() - 0.5) * B, y = (Math.random() - 0.5) * B, z = (Math.random() - 0.5) * B, sd = Math.random();
+        for (let k = 0; k < 2; k++) { base.set([x, y, z], (i * 2 + k) * 3); end[i * 2 + k] = k; seed[i * 2 + k] = sd; }
+      }
+      const rg = new THREE.BufferGeometry();
+      rg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nr * 2 * 3), 3));
+      rg.setAttribute('aBase', new THREE.BufferAttribute(base, 3));
+      rg.setAttribute('aEnd', new THREE.BufferAttribute(end, 1));
+      rg.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+      this.rainU = { uCam: { value: new THREE.Vector3() }, uRel: { value: new THREE.Vector3() }, uBox: { value: B }, uTime: timeU, uLen: { value: 0.035 },
+        uColor: { value: new THREE.Color(0.55, 0.66, 0.85) }, uPower: { value: 0.95 } };
+      this.rain = new THREE.LineSegments(rg, new THREE.ShaderMaterial({
+        vertexShader: rainVS, fragmentShader: rainFS, uniforms: this.rainU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      }));
+      this.rain.frustumCulled = false; this.rain.renderOrder = 8;
+      scene.add(this.rain);
+    }
     // ---- sparks
     const ns = 160;
     this.sp = { n: ns, pos: new Float32Array(ns * 3), vel: new Float32Array(ns * 3), life: new Float32Array(ns), col: new Float32Array(ns * 3), size: new Float32Array(ns), phase: new Float32Array(ns), head: 0 };
@@ -182,7 +225,7 @@ export class FX {
     this.under.position.set(0, -0.6, 0);
     taxiGroup.add(this.under);
     this.rear = new THREE.PointLight(0xff2a1a, 260, 40, 1.6);
-    this.rear.position.set(0, 1.0, -3.6);
+    this.rear.position.set(0, -1.2, -8.0);
     taxiGroup.add(this.rear);
     this.beams = [];
     // ---- rooftop searchlights (volumetric-looking cones)
@@ -234,13 +277,16 @@ export class FX {
       l.mesh.rotation.set(Math.sin(a) * l.tilt, 0, Math.cos(a * 0.9) * l.tilt);
     }
     // thrusters
-    const pw = 0.45 + 0.35 * clamp(taxi.speed / 60, 0, 1) + 0.9 * taxi.boost + 0.15 * (inp.gasV ? 1 : 0);
+    const pw = 0.18 + 0.2 * clamp(taxi.speed / 60, 0, 1) + 0.45 * taxi.boost;
     for (const f of this.flames) {
       f.m.uniforms.uPower.value = pw;
       f.mesh.scale.set(1, 1, 0.45 + 0.85 * clamp(0.35 + taxi.boost + taxi.speed / 140, 0, 1.3));
     }
     this.under.intensity = 700 + 400 * taxi.boost;
-    this.rear.intensity = inp.brakeV ? 380 : 110;
+    this.rear.intensity = 0; this.rear.visible = false;
+    // rain
+    this.rainU.uCam.value.copy(camera.position);
+    this.rainU.uRel.value.copy(taxi.vel);
     // streaks
     const su = this.streakU;
     su.uCam.value.copy(camera.position);
