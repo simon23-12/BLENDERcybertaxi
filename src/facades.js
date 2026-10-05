@@ -52,10 +52,11 @@ export function makeBuildingMaterial(fx) {
   const uniforms = {
     tAlb: { value: fx.A }, tNrm: { value: fx.N }, tEm: { value: fx.E }, tMeta: { value: fx.M },
     uCells: { value: fx.cells }, uTime: timeU, uTile: { value: fx.tile }, uEmitMax: { value: fx.emitMax },
-    uEmitGain: { value: 1.0 }, uAmbLow: { value: 0.14 },
+    uEmitGain: { value: 1.0 }, uAmbLow: { value: 0.14 }, uPar: { value: fx.parallax ?? 0 },
   };
   m.userData.uniforms = uniforms;
-  enableSkyFog(m, { key: 'building' });
+  if (fx.parallaxSteps) m.defines = { ...(m.defines || {}), PARALLAX_STEPS: fx.parallaxSteps };
+  enableSkyFog(m, { key: 'building' + (fx.parallaxSteps || 0) });
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (sh, r) => {
     Object.assign(sh.uniforms, uniforms);
@@ -91,7 +92,7 @@ export function makeBuildingMaterial(fx) {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
         uniform sampler2DArray tAlb; uniform sampler2DArray tNrm; uniform sampler2DArray tEm; uniform sampler2DArray tMeta;
-        uniform vec2 uCells[7]; uniform float uTime; uniform float uEmitMax; uniform float uEmitGain; uniform float uAmbLow;
+        uniform vec2 uCells[7]; uniform float uTime; uniform float uEmitMax; uniform float uEmitGain; uniform float uAmbLow; uniform float uPar; uniform float uTile;
         varying vec4 vInfo; varying vec2 vUvT; varying vec3 vWN; varying vec3 vWT; varying vec3 vWB; varying vec3 vWP; varying float vLayer;
         float h21(vec2 p){ p = fract(p * vec2(443.897, 441.423)); p += dot(p, p.yx + 19.19); return fract((p.x + p.y) * p.x); }
         vec3 hueRot(vec3 c, float a){ float s = sin(a), co = cos(a); vec3 k = vec3(0.57735);
@@ -100,12 +101,41 @@ export function makeBuildingMaterial(fx) {
           float a = h21(i.xy + i.z*17.0), b = h21(i.xy + vec2(1.,0.) + i.z*17.0), c = h21(i.xy + vec2(0.,1.) + i.z*17.0), d = h21(i.xy + vec2(1.,1.) + i.z*17.0);
           float a2 = h21(i.xy + (i.z+1.)*17.0), b2 = h21(i.xy + vec2(1.,0.) + (i.z+1.)*17.0), c2 = h21(i.xy + vec2(0.,1.) + (i.z+1.)*17.0), d2 = h21(i.xy + vec2(1.,1.) + (i.z+1.)*17.0);
           return mix(mix(mix(a,b,f.x), mix(c,d,f.x), f.y), mix(mix(a2,b2,f.x), mix(c2,d2,f.x), f.y), f.z); }
-        vec4 cybTexA, cybTexN, cybTexE, cybTexM;`)
+        vec4 cybTexA, cybTexN, cybTexE, cybTexM; vec2 vCybUv;`)
       .replace('#include <map_fragment>', `
         {
-          vec3 uvw = vec3(vUvT, vLayer);
-          cybTexA = texture(tAlb, uvw); cybTexN = texture(tNrm, uvw); cybTexE = texture(tEm, uvw); cybTexM = texture(tMeta, uvw);
-          vec3 tintA = hueRot(vec3(1.0), 0.0);
+          vec2 uvb = vUvT;
+          vec2 gx = dFdx(vUvT), gy = dFdy(vUvT);
+          #ifdef PARALLAX_STEPS
+          {
+            vec3 Vw = cameraPosition - vWP;
+            float dist = length(Vw);
+            float pf = 1.0 - smoothstep(55.0, 140.0, dist);
+            vec3 Vn = Vw / dist;
+            vec3 Vt = vec3(dot(Vn, vWT), dot(Vn, vWB), dot(Vn, vWN));
+            if (pf > 0.02 && Vt.z > 0.12) {
+              float scale = 2.0 / uTile * pf;                 // height range 0.42..0.75 of 6 m = 2 m of relief
+              vec2 dUV = (Vt.xy / Vt.z) * scale / float(PARALLAX_STEPS);
+              float layerD = 1.0 / float(PARALLAX_STEPS);
+              float curD = 0.0;
+              vec2 uvc = uvb;
+              float hh0 = 1.0 - clamp((textureGrad(tMeta, vec3(uvc, vLayer), gx, gy).b - 0.42) / 0.33, 0.0, 1.0);
+              float prevD = 0.0, prevH = hh0;
+              for (int i = 0; i < PARALLAX_STEPS; i++) {
+                if (curD >= hh0) break;
+                prevD = curD; prevH = hh0;
+                uvc -= dUV; curD += layerD;
+                hh0 = 1.0 - clamp((textureGrad(tMeta, vec3(uvc, vLayer), gx, gy).b - 0.42) / 0.33, 0.0, 1.0);
+              }
+              float after = hh0 - curD, before = prevH - prevD;
+              float wgt = after / (after - before - 1e-5);
+              uvb = uvc + dUV * clamp(wgt, 0.0, 1.0);
+            }
+          }
+          #endif
+          vec3 uvw = vec3(uvb, vLayer);
+          vCybUv = uvb;
+          cybTexA = textureGrad(tAlb, uvw, gx, gy); cybTexN = textureGrad(tNrm, uvw, gx, gy); cybTexE = textureGrad(tEm, uvw, gx, gy); cybTexM = textureGrad(tMeta, uvw, gx, gy);
           diffuseColor.rgb *= cybTexA.rgb * (0.85 + 0.3 * fract(vInfo.y * 91.3));
         }`)
       .replace('#include <roughnessmap_fragment>', `float roughnessFactor = max(cybTexN.b, 0.05);`)
@@ -120,7 +150,7 @@ export function makeBuildingMaterial(fx) {
       .replace('#include <emissivemap_fragment>', `
         {
           vec2 cells = uCells[int(vLayer + 0.5)];
-          vec2 cid = floor(vUvT * cells);
+          vec2 cid = floor(vCybUv * cells);
           float hh = h21(cid + vInfo.y * 91.7 + vLayer * 13.1);
           float lit = step(hh, vInfo.w);
           float fl = step(0.97, h21(cid * 1.7 + 7.7)) * step(0.0, sin(uTime * (1.5 + hh * 2.0) + hh * 40.0));

@@ -18,10 +18,10 @@ import { timeU, clamp } from './util.js';
 const $ = (id) => document.getElementById(id);
 
 const TIERS = {
-  low:    { name: 'low',    dpr: 1.0, msaa: 0, bloomLevels: 4, texRes: 512,  aniso: 2, skyW: 2048, traffic: 140, searchlights: 4, signs: 160, streaks: 120, vehTex: 512,  taxiTex: 1024 },
-  medium: { name: 'medium', dpr: 1.5, msaa: 0, bloomLevels: 5, texRes: 1024, aniso: 4, skyW: 2048, traffic: 300, searchlights: 8, signs: 280, streaks: 200, vehTex: 512,  taxiTex: 1024 },
-  high:   { name: 'high',   dpr: 2.0, msaa: 4, bloomLevels: 5, texRes: 1024, aniso: 4, skyW: 4096, traffic: 460, searchlights: 12, signs: 400, streaks: 280, vehTex: 1024, taxiTex: 2048 },
-  ultra:  { name: 'ultra',  dpr: 3.0, msaa: 4, bloomLevels: 6, texRes: 1536, aniso: 8, skyW: 4096, traffic: 640, searchlights: 16, signs: 520, streaks: 360, vehTex: 1024, taxiTex: 2048 },
+  low:    { name: 'low',    dpr: 1.0, msaa: 0, bloomLevels: 4, texRes: 512,  aniso: 2, parallax: 0, skyW: 2048, traffic: 140, searchlights: 4, signs: 160, streaks: 120, vehTex: 512,  taxiTex: 1024 },
+  medium: { name: 'medium', dpr: 1.5, msaa: 0, bloomLevels: 5, texRes: 1024, aniso: 4, parallax: 4, skyW: 2048, traffic: 300, searchlights: 8, signs: 280, streaks: 200, vehTex: 512,  taxiTex: 1024 },
+  high:   { name: 'high',   dpr: 2.0, msaa: 4, bloomLevels: 5, texRes: 1024, aniso: 4, parallax: 5, skyW: 4096, traffic: 460, searchlights: 12, signs: 400, streaks: 280, vehTex: 1024, taxiTex: 2048 },
+  ultra:  { name: 'ultra',  dpr: 3.0, msaa: 4, bloomLevels: 6, texRes: 1536, aniso: 8, parallax: 6, skyW: 4096, traffic: 640, searchlights: 16, signs: 520, streaks: 360, vehTex: 1024, taxiTex: 2048 },
 };
 
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -118,6 +118,7 @@ async function boot() {
 
   let done = 0;
   const fx_ = await loadFacades(renderer, tier, () => { done++; prog.tex = done / 28; upd('FACADES'); });
+  fx_.parallaxSteps = tier.parallax || 0;
   const bmat = makeBuildingMaterial(fx_);
   const city = new City().generate(1337);
   const cityMesh = city.buildMesh(bmat);
@@ -136,7 +137,7 @@ async function boot() {
   const vehicles = {};
   let vi = 0;
   await Promise.all(kinds.map(async (k) => {
-    try { vehicles[k] = await loadVehicle(k, renderer, { size: k === 'taxi' ? tier.taxiTex : tier.vehTex, emissive: k === 'taxi' ? 2.0 : 2.2 }); }
+    try { vehicles[k] = await loadVehicle(k, renderer, { size: k === 'taxi' ? tier.taxiTex : tier.vehTex, emissive: k === 'taxi' ? 1.4 : 2.2 }); }
     catch (e) { console.warn('vehicle', k, e); }
     vi++; prog.veh = vi / kinds.length; upd('VEHICLES');
   }));

@@ -83,6 +83,16 @@ export class City {
         if (a1 - a0 < 24 || b1 - b0 < 24 || y1 - y0 < 8) return -1;
         const id = this.addBox({ x0: a0, x1: a1, y0, y1, z0: b0, z1: b1, layer, seed: seedv, hue, lit });
         tower.tiers.push(id);
+        // architectural trim (no collision): cornice + belt bands
+        const th = y1 - y0;
+        if (th >= 40) {
+          const tl = layer === 4 ? 4 : 5;
+          this.addBox({ x0: a0 - 1.5, x1: a1 + 1.5, y0: y1 - 2, y1: y1 + 1, z0: b0 - 1.5, z1: b1 + 1.5, layer: tl, seed: seedv, hue, lit: 0, solid: false });
+          const step = 88 + 8 * Math.floor(rng() * 3);
+          for (let yy = y0 + step; yy < y1 - 16; yy += step) {
+            this.addBox({ x0: a0 - 0.8, x1: a1 + 0.8, y0: yy, y1: yy + 3, z0: b0 - 0.8, z1: b1 + 0.8, layer: tl, seed: seedv, hue, lit: 0, solid: false });
+          }
+        }
         return id;
       };
       let y = baseY;
@@ -107,6 +117,17 @@ export class City {
           push(x0 + ins2, x1 - ins2, z0 + ins2, z1 - ins2, t2, H, layerU === 5 ? 0 : 5);
         }
         ins = ins;
+      }
+      // roof clutter on the top tier
+      {
+        const tb = this.boxes[tower.tiers[tower.tiers.length - 1]];
+        const n = 2 + Math.floor(rng() * 4);
+        for (let k = 0; k < n; k++) {
+          const w = 8 * Math.floor(R(1, 3)), d = 8 * Math.floor(R(1, 3));
+          if (tb.x1 - tb.x0 < w + 16 || tb.z1 - tb.z0 < d + 16) continue;
+          const px = R(tb.x0 + 8, tb.x1 - 8 - w), pz = R(tb.z0 + 8, tb.z1 - 8 - d);
+          this.addBox({ x0: px, x1: px + w, y0: tb.y1, y1: tb.y1 + R(4, 12), z0: pz, z1: pz + d, layer: 2, seed: rng(), hue: 0, lit: 0.2, solid: false });
+        }
       }
       // spire
       const sx = (x0 + x1) / 2, sz = (z0 + z1) / 2;
@@ -269,6 +290,7 @@ export class City {
           for (const id of arr) {
             if (seen.has(id)) continue; seen.add(id);
             const b = this.boxes[id];
+            if (b.solid === false) continue;
             const cx = clamp(p.x, b.x0, b.x1), cy = clamp(p.y, b.y0, b.y1), cz = clamp(p.z, b.z0, b.z1);
             let dx = p.x - cx, dy = p.y - cy, dz = p.z - cz;
             const d2 = dx * dx + dy * dy + dz * dz;

@@ -356,6 +356,39 @@ def roof(B, M, rng):
         B.box(k, k + 0.4, 31.5, 31.8, -0.2, -0.0, M["lamp"], LIN(0x2090FF))
 
 
+def greebles(B, M, rng, n, sleek=False):
+    """extra small-scale clutter: vents, conduits, junction boxes with lamps, brackets, rain streaks"""
+    W = TILE
+    for _ in range(n):
+        k = rng.random()
+        x, z = rng.uniform(0, W), rng.uniform(0, W)
+        if k < 0.30:
+            w, h, d = rng.uniform(0.25, 0.9), rng.uniform(0.2, 0.7), rng.uniform(0.08, 0.32)
+            B.box(x, x + w, z, z + h, -d, 0.0, rng.choice([M["steel"], M["steel_l"], M["black"], M["concrete_w"]]))
+            if rng.random() < 0.5:
+                for q in range(int(h / 0.1)):
+                    B.box(x + 0.03, x + w - 0.03, z + 0.05 + q * 0.1, z + 0.08 + q * 0.1, -d - 0.02, -d, M["dark"])
+        elif k < 0.48:
+            ln = rng.uniform(1.0, 5.0)
+            B.cyl_x(x, x + ln, z, -rng.uniform(0.1, 0.4), rng.uniform(0.035, 0.09), rng.choice([M["steel_l"], M["rust"], M["black"], M["blue_p"]]), seg=8)
+            for c in np.arange(x + 0.4, x + ln, 1.1):
+                B.box(c, c + 0.07, z - 0.12, z + 0.12, -0.35, -0.05, M["steel"])
+        elif k < 0.64:
+            ln = rng.uniform(1.0, 6.0)
+            B.cyl_z(x, z, z + ln, -rng.uniform(0.1, 0.4), rng.uniform(0.035, 0.09), rng.choice([M["steel_l"], M["rust"], M["black"], M["yellow"]]), seg=8)
+        elif k < 0.80:
+            B.box(x, x + 0.4, z, z + 0.3, -0.25, 0.0, M["steel"])
+            c = rng.choice([LIN(0xFF7A18), LIN(0xFF2A18), LIN(0xFFE8C0), LIN(0x18F0FF)])
+            B.box(x + 0.1, x + 0.3, z + 0.08, z + 0.22, -0.3, -0.25, M["lamp"], c)
+        elif k < 0.90 and not sleek:
+            B.box(x, x + 0.05, z, z + rng.uniform(1.5, 6.0), -0.03, 0.0, M["concrete_d"])   # rain streak
+        else:
+            B.box(x, x + 0.12, z, z + 0.12, -0.5, 0.0, M["steel"])
+            B.box(x - 0.3, x + 0.42, z + 0.1, z + 0.14, -0.55, -0.45, M["steel_l"])
+
+
+GREEB = [60, 230, 210, 260, 130, 70, 190]
+
 TYPES = [glass_tower, brutal, industrial, neon_resid, deco, monolith, roof]
 NAMES = ["glass", "brutal", "industrial", "neon", "deco", "monolith", "roof"]
 
@@ -370,12 +403,13 @@ def render_type(t, res):
     rng = random.Random(1000 + t)
     B = Builder(tile=(TILE, TILE))
     TYPES[t](B, M, rng)
+    greebles(B, M, random.Random(77 + t), GREEB[t], sleek=t in (0, 5))
     objs = B.finish(name=NAMES[t])
     print(f"[facade {t}:{NAMES[t]}] {B.count} primitives")
     base = os.path.join(OUT, f"f{t}")
     # data passes first
     for mode, spp, tr in (("albedo", 24, "Standard"), ("rough", 8, "Raw"), ("normal", 12, "Raw"),
-                          ("meta", 8, "Raw"), ("emit", 16, "Standard"), ("ao", 160, "Raw"), ("height", 6, "Raw")):
+                          ("meta", 8, "Raw"), ("emit", 16, "Standard"), ("ao", 72, "Raw"), ("height", 6, "Raw")):
         set_all_modes(mode)
         scene.cycles.samples = spp
         if mode == "height":

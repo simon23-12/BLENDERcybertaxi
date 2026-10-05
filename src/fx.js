@@ -240,7 +240,7 @@ export class FX {
       f.mesh.scale.set(1, 1, 0.45 + 0.85 * clamp(0.35 + taxi.boost + taxi.speed / 140, 0, 1.3));
     }
     this.under.intensity = 700 + 400 * taxi.boost;
-    this.rear.intensity = inp.brakeV ? 700 : 200;
+    this.rear.intensity = inp.brakeV ? 380 : 110;
     // streaks
     const su = this.streakU;
     su.uCam.value.copy(camera.position);

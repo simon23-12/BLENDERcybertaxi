@@ -69,8 +69,8 @@ export class Signs {
       const c = (rng() - 0.5) * (along - w - 8);
       const mx = (b.x0 + b.x1) / 2, mz = (b.z0 + b.z1) / 2;
       let nx = 0, nz = 0, px, pz;
-      if (face === 0) { nx = 1; px = b.x1 + 1.1; pz = mz + c; } else if (face === 1) { nx = -1; px = b.x0 - 1.1; pz = mz + c; }
-      else if (face === 2) { nz = 1; pz = b.z1 + 1.1; px = mx + c; } else { nz = -1; pz = b.z0 - 1.1; px = mx + c; }
+      if (face === 0) { nx = 1; px = b.x1 + 0.45; pz = mz + c; } else if (face === 1) { nx = -1; px = b.x0 - 0.45; pz = mz + c; }
+      else if (face === 2) { nz = 1; pz = b.z1 + 0.45; px = mx + c; } else { nz = -1; pz = b.z0 - 0.45; px = mx + c; }
       // free space in front of the sign (so it is visible from the street)
       const ext = 18;
       const ax0 = Math.min(px, px + nx * ext) - (nz ? w / 2 : 0), ax1 = Math.max(px, px + nx * ext) + (nz ? w / 2 : 0);

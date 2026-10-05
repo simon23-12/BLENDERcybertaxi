@@ -91,14 +91,14 @@ export class Input {
       const dz = 2.0 * D2R;
       const shape = (x, range) => { const a = Math.max(0, Math.abs(x) - dz) / range; return Math.sign(x) * Math.min(1, Math.pow(a, 1.15)); };
       steer = shape(ds, 25 * D2R / this.sens);
-      pitch = shape(de, 24 * D2R / this.sens) * (this.invert ? -1 : 1);
+      pitch = shape(de, 24 * D2R / this.sens) * (this.invert ? 1 : -1);   // default: top away = climb
       this.lastTilt.steer = ds; this.lastTilt.pitch = de;
     }
     // keyboard (also works together with tilt)
     const kx = (k.has('ArrowRight') || k.has('KeyD') ? 1 : 0) - (k.has('ArrowLeft') || k.has('KeyA') ? 1 : 0);
     const ky = (k.has('ArrowUp') || k.has('KeyW') ? 1 : 0) - (k.has('ArrowDown') || k.has('KeyS') ? 1 : 0);
     if (kx) steer = kx;
-    if (ky) pitch = ky * (this.invert ? -1 : 1);
+    if (ky) pitch = ky;
     const gasKey = k.has('Space') || k.has('ShiftLeft') || k.has('ShiftRight') || k.has('KeyE');
     const brakeKey = k.has('KeyB') || k.has('ControlLeft') || k.has('KeyQ');
     // smooth
