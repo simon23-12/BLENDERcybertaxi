@@ -185,6 +185,22 @@ export class FX {
     this.rear.position.set(0, 1.0, -3.6);
     taxiGroup.add(this.rear);
     this.beams = [];
+    // ---- rooftop searchlights (volumetric-looking cones)
+    this.search = [];
+    const tops = city.beacons.filter((p) => p.y > 220);
+    const cols = [0xbfe8ff, 0x35e8ff, 0xff7ad8, 0xffd9a0];
+    const nS = Math.min(tier.searchlights ?? 10, tops.length);
+    for (let i = 0; i < nS; i++) {
+      const p = tops[Math.floor((i + 0.5) * tops.length / nS)];
+      const g = new THREE.CylinderGeometry(26, 0.6, 900, 24, 1, true);
+      g.translate(0, 450, 0);
+      const m = addMat(beamVS, beamFS, { uColor: { value: new THREE.Color(cols[i % cols.length]) }, uTime: timeU, uGain: { value: 0.16 } }, { side: THREE.DoubleSide });
+      const mesh = new THREE.Mesh(g, m);
+      mesh.position.copy(p); mesh.position.y -= 2;
+      mesh.frustumCulled = false; mesh.renderOrder = 2;
+      scene.add(mesh);
+      this.search.push({ mesh, ph: Math.random() * 6.28, sp: 0.12 + Math.random() * 0.2, tilt: 0.22 + Math.random() * 0.3 });
+    }
   }
 
   addBeam(color, radius, height) {
@@ -213,6 +229,10 @@ export class FX {
   }
 
   update(dt, taxi, camera, inp) {
+    for (const l of this.search) {
+      const a = timeU.value * l.sp + l.ph;
+      l.mesh.rotation.set(Math.sin(a) * l.tilt, 0, Math.cos(a * 0.9) * l.tilt);
+    }
     // thrusters
     const pw = 0.45 + 0.35 * clamp(taxi.speed / 60, 0, 1) + 0.9 * taxi.boost + 0.15 * (inp.gasV ? 1 : 0);
     for (const f of this.flames) {

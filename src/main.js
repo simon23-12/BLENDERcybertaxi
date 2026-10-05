@@ -12,15 +12,16 @@ import { FX } from './fx.js';
 import { AudioEngine } from './audio.js';
 import { Missions } from './missions.js';
 import { Props } from './props.js';
+import { Signs } from './signs.js';
 import { timeU, clamp } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 
 const TIERS = {
-  low:    { name: 'low',    dpr: 1.0, msaa: 0, bloomLevels: 4, texRes: 512,  skyW: 2048, traffic: 140, streaks: 120, vehTex: 512,  taxiTex: 1024 },
-  medium: { name: 'medium', dpr: 1.5, msaa: 0, bloomLevels: 5, texRes: 1024, skyW: 2048, traffic: 300, streaks: 200, vehTex: 512,  taxiTex: 1024 },
-  high:   { name: 'high',   dpr: 2.0, msaa: 4, bloomLevels: 5, texRes: 1024, skyW: 4096, traffic: 460, streaks: 280, vehTex: 1024, taxiTex: 2048 },
-  ultra:  { name: 'ultra',  dpr: 3.0, msaa: 4, bloomLevels: 6, texRes: 1536, skyW: 4096, traffic: 640, streaks: 360, vehTex: 1024, taxiTex: 2048 },
+  low:    { name: 'low',    dpr: 1.0, msaa: 0, bloomLevels: 4, texRes: 512,  aniso: 2, skyW: 2048, traffic: 140, searchlights: 4, signs: 160, streaks: 120, vehTex: 512,  taxiTex: 1024 },
+  medium: { name: 'medium', dpr: 1.5, msaa: 0, bloomLevels: 5, texRes: 1024, aniso: 4, skyW: 2048, traffic: 300, searchlights: 8, signs: 280, streaks: 200, vehTex: 512,  taxiTex: 1024 },
+  high:   { name: 'high',   dpr: 2.0, msaa: 4, bloomLevels: 5, texRes: 1024, aniso: 4, skyW: 4096, traffic: 460, searchlights: 12, signs: 400, streaks: 280, vehTex: 1024, taxiTex: 2048 },
+  ultra:  { name: 'ultra',  dpr: 3.0, msaa: 4, bloomLevels: 6, texRes: 1536, aniso: 8, skyW: 4096, traffic: 640, searchlights: 16, signs: 520, streaks: 360, vehTex: 1024, taxiTex: 2048 },
 };
 
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -28,7 +29,18 @@ const isTouch = navigator.maxTouchPoints > 0;
 const qs = new URLSearchParams(location.search);
 let tierName = qs.get('q') || (() => { try { return localStorage.getItem('cybertaxi.q'); } catch (_) { return null; } })() || (isIOS ? 'ultra' : 'high');
 if (!TIERS[tierName]) tierName = 'high';
+const ORDER = ['low', 'medium', 'high', 'ultra'];
+let downgraded = false;
+try {
+  if (localStorage.getItem('cybertaxi.boot') === '1' && !qs.get('q')) {
+    const i = Math.max(0, ORDER.indexOf(tierName) - 1);
+    if (i < ORDER.indexOf(tierName)) { tierName = ORDER[i]; downgraded = true; localStorage.setItem('cybertaxi.q', tierName); }
+  }
+  localStorage.setItem('cybertaxi.boot', '1');
+  setTimeout(() => { try { localStorage.removeItem('cybertaxi.boot'); } catch (_) {} }, 12000);
+} catch (_) {}
 const tier = TIERS[tierName];
+if (qs.get('msaa') === '0') tier.msaa = 0;
 let gameMode = (() => { try { return localStorage.getItem('cybertaxi.mode'); } catch (_) { return null; } })() || 'taxi';
 
 function fatal(msg) {
@@ -55,6 +67,11 @@ async function boot() {
   const gpuName = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'WEBGL2';
   $('gpu-name').textContent = 'WEBGL2 · ' + tier.name.toUpperCase();
   console.log('[cybertaxi]', tier.name, gpuName, 'maxTex', renderer.capabilities.maxTextureSize, 'aniso', renderer.capabilities.getMaxAnisotropy());
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    try { const i = Math.max(0, ORDER.indexOf(tier.name) - 1); localStorage.setItem('cybertaxi.q', ORDER[i]); } catch (_) {}
+    fatal('The GPU ran out of memory (WebGL context lost). Reload the page – the graphics level was lowered automatically.');
+  });
   const hdrOK = renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float');
   if (!hdrOK) return fatal('This device does not support half-float render targets (EXT_color_buffer_float).');
 
@@ -66,7 +83,7 @@ async function boot() {
   const post = new Post(renderer, { msaa: tier.msaa, bloomLevels: tier.bloomLevels });
 
   // ------------------------------------------------------------------ resolution handling
-  const state = { scale: 1.0, minScale: 0.5, lock: 0, w: 0, h: 0 };
+  const state = { scale: isIOS ? 0.82 : 1.0, minScale: 0.5, lock: 0, w: 0, h: 0 };
   function applySize(force = false) {
     const dpr = Math.min(window.devicePixelRatio || 1, tier.dpr) * state.scale;
     const w = Math.max(64, Math.floor(window.innerWidth * dpr)), h = Math.max(64, Math.floor(window.innerHeight * dpr));
@@ -111,13 +128,15 @@ async function boot() {
   const props = new Props(scene, city, renderer);
   const ground = props.makeGround();
   scene.add(ground);
+  let signs = null;
+  try { signs = await new Signs(scene, city).load(renderer, tier.signs); } catch (e) { console.warn('signs', e); }
 
   // ------------------------------------------------------------------ vehicles
   const kinds = ['taxi', 'sedan', 'sport', 'van', 'truck', 'bus'];
   const vehicles = {};
   let vi = 0;
   await Promise.all(kinds.map(async (k) => {
-    try { vehicles[k] = await loadVehicle(k, renderer, { size: k === 'taxi' ? tier.taxiTex : tier.vehTex, emissive: k === 'taxi' ? 3.2 : 2.6 }); }
+    try { vehicles[k] = await loadVehicle(k, renderer, { size: k === 'taxi' ? tier.taxiTex : tier.vehTex, emissive: k === 'taxi' ? 2.0 : 2.2 }); }
     catch (e) { console.warn('vehicle', k, e); }
     vi++; prog.veh = vi / kinds.length; upd('VEHICLES');
   }));
@@ -195,7 +214,7 @@ async function boot() {
     $('title').classList.add('out');
     hud.show();
     setTimeout(() => $('title').classList.add('hidden'), 1000);
-    if (!granted && isTouch && isIOS) hud.toast('MOTION ACCESS DENIED\nENABLE IN SETTINGS › SAFARI › MOTION', 5000);
+    if (!granted && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function' && /iPhone|iPad/.test(navigator.userAgent)) hud.toast('MOTION ACCESS DENIED\nENABLE IN SETTINGS › SAFARI › MOTION', 5000);
     else if (!input.hasMotion && !isTouch) hud.toast('DESKTOP: ARROWS / WASD · SPACE = GAS · B = BRAKE', 5000);
     missions.setMode(gameMode);
     if (gameMode === 'taxi') $('fare').classList.remove('hidden'); else $('fare').classList.add('hidden');
@@ -215,7 +234,8 @@ async function boot() {
   $('t-menu').classList.remove('hidden');
   $('title').classList.add('live');
   window.__booted = true;
-  window.__ct = { fogU, taxi, input, city, camera, post, renderer, scene, traffic, missions, fx, state, tier, sky, audio };
+  if (downgraded) hud.toast('GRAPHICS LOWERED TO ' + tier.name.toUpperCase() + '\n(previous start did not finish)', 4500);
+  window.__ct = { signs, fogU, taxi, input, city, camera, post, renderer, scene, traffic, missions, fx, state, tier, sky, audio };
 
   function loop(now) {
     let dt = (now - last) / 1000; last = now;
@@ -229,10 +249,10 @@ async function boot() {
       const hit = traffic.collide(taxi.pos, 3.4, taxi.vel);
       if (hit && hit.impact > 3) { taxi.impact = Math.max(taxi.impact || 0, hit.impact); taxi.hit = 0; }
       traffic.update(dtc, taxi.pos);
-      if (taxi.impact > 5) {
+      if (taxi.impact > 5 && playing) {
         audio.impact(taxi.impact);
         fx.spark(taxi.pos, 14 + Math.min(30, taxi.impact), 16 + taxi.impact * 0.6, [1.0, 0.65, 0.25]);
-        if (navigator.vibrate && isTouch) navigator.vibrate(Math.min(60, 10 + taxi.impact));
+        if (playing && navigator.vibrate && isTouch) navigator.vibrate(Math.min(60, 10 + taxi.impact));
       }
       // sparks while scraping
       // taxi mesh transform with a tiny hover wobble

@@ -5,7 +5,7 @@ import { loadImage, timeU } from './util.js';
 
 const ROOF_LAYER = 6;
 
-async function loadArray(urls, size, colorSpace, renderer, onTick) {
+async function loadArray(urls, size, colorSpace, renderer, onTick, aniso = 4) {
   const n = urls.length;
   const data = new Uint8Array(size * size * 4 * n);
   const cv = document.createElement('canvas');
@@ -26,7 +26,7 @@ async function loadArray(urls, size, colorSpace, renderer, onTick) {
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  tex.anisotropy = Math.min(aniso, renderer.capabilities.getMaxAnisotropy());
   tex.unpackAlignment = 4;
   tex.needsUpdate = true;
   return tex;
@@ -38,9 +38,9 @@ export async function loadFacades(renderer, tier, onTick) {
   const tag = tier.texRes >= 1536 ? '2k' : '1k';
   const u = (k, sfx) => Array.from({ length: n }, (_, i) => `assets/tex/f${i}_${k}${sfx}.webp`);
   const sizeA = tier.texRes, sizeE = Math.min(tier.texRes, 1024);
-  const A = await loadArray(u('a', '_' + tag), sizeA, THREE.SRGBColorSpace, renderer, onTick);
-  const Nr = await loadArray(u('n', '_' + tag), sizeA, THREE.NoColorSpace, renderer, onTick);
-  const E = await loadArray(u('e', '_' + tag), sizeE, THREE.SRGBColorSpace, renderer, onTick);
+  const A = await loadArray(u('a', '_' + tag), sizeA, THREE.SRGBColorSpace, renderer, onTick, tier.aniso);
+  const Nr = await loadArray(u('n', '_' + tag), sizeA, THREE.NoColorSpace, renderer, onTick, tier.aniso);
+  const E = await loadArray(u('e', '_' + tag), sizeE, THREE.SRGBColorSpace, renderer, onTick, tier.aniso);
   const Mt = await loadArray(u('m', ''), 512, THREE.NoColorSpace, renderer, onTick);
   return { A, N: Nr, E, M: Mt, cells: meta.types.map((t) => new THREE.Vector2(t.cells[0], t.cells[1])), tile: meta.tile, emitMax: meta.emitMax };
 }

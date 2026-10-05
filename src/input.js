@@ -90,7 +90,7 @@ export class Input {
       const de = r.elev - this._neutral.elev;
       const dz = 2.0 * D2R;
       const shape = (x, range) => { const a = Math.max(0, Math.abs(x) - dz) / range; return Math.sign(x) * Math.min(1, Math.pow(a, 1.15)); };
-      steer = shape(ds, 32 * D2R / this.sens);
+      steer = shape(ds, 25 * D2R / this.sens);
       pitch = shape(de, 24 * D2R / this.sens) * (this.invert ? -1 : 1);
       this.lastTilt.steer = ds; this.lastTilt.pitch = de;
     }
